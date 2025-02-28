@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -76,7 +77,7 @@ func encryptFile(filename string, password string) error {
 	}
 	defer file.Close()
 
-	outFile, err := os.Open("v8p.me-cli.tmp")
+	outFile, err := os.Create("v8p.me-cli.tmp")
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func encryptFile(filename string, password string) error {
 	buf := make([]byte, chunkSize)
 	for {
 		n, err := file.Read(buf)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return err
 		}
 		if n == 0 {
@@ -133,7 +134,7 @@ func encryptFile(filename string, password string) error {
 }
 
 func deriveKey(password string, salt []byte, iterations int) ([]byte, error) {
-	key, err := pbkdf2.Key(sha256.New, password, salt, iterations, 256)
+	key, err := pbkdf2.Key(sha256.New, password, salt, iterations, 32)
 	if err != nil {
 		return nil, err
 	}
