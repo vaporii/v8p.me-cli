@@ -1,8 +1,14 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/pbkdf2"
+	"crypto/rand"
+	"crypto/sha256"
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,8 +16,15 @@ import (
 
 var password string
 var copy bool
-var expires string
+var expiresString string
+var expires int64
 var filename string
+
+const (
+	iterations = 100000
+	chunkSize  = 1 * 1000 * 1000 // 1mb per chunk
+	saltSize   = 16
+)
 
 func main() {
 	const passwordUsage = "enable encryption and set a password (-p <password>)"
@@ -23,8 +36,8 @@ func main() {
 	flag.BoolVar(&copy, "c", false, copyUsage)
 
 	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
-	flag.StringVar(&expires, "expires", "1w", expiresUsage)
-	flag.StringVar(&expires, "e", "1w", expiresUsage)
+	flag.StringVar(&expiresString, "expires", "1w", expiresUsage)
+	flag.StringVar(&expiresString, "e", "1w", expiresUsage)
 
 	flag.Parse()
 
@@ -35,7 +48,69 @@ func main() {
 		return
 	}
 
+	expires, err := parseExpiry(expiresString)
+	if err != nil {
+		fmt.Println("error: could not parse expiry")
+		printUsage()
+		return
+	}
+
+	_ = expires
+
 	filename = args[len(args)-1]
+}
+
+func encryptFile(filename string, password string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	outFile, err := os.Open("/tmp/v8p.me-cli")
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	salt := make([]byte, saltSize)
+	if _, err := rand.Read(salt); err != nil {
+		return err
+	}
+	if _, err := outFile.Write(salt); err != nil {
+		return err
+	}
+
+	key, err := deriveKey(password, salt, iterations)
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, chunkSize)
+	for {
+		n, err := file.Read(buf)
+		if err != nil {
+			return err
+		}
+
+	}
+}
+
+func deriveKey(password string, salt []byte, iterations int) ([]byte, error) {
+	key, err := pbkdf2.Key(sha256.New, password, salt, iterations, 256)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
 
 func printUsage() {
