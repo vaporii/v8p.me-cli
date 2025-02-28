@@ -1,14 +1,50 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
+var password string
+var copy bool
+var expires string
+var filename string
+
 func main() {
-	fmt.Println("hello, world")
+	const passwordUsage = "enable encryption and set a password (-p <password>)"
+	flag.StringVar(&password, "password", "", passwordUsage)
+	flag.StringVar(&password, "p", "", passwordUsage)
+
+	const copyUsage = "copy the resulting url to the clipboard (-c)"
+	flag.BoolVar(&copy, "copy", false, copyUsage)
+	flag.BoolVar(&copy, "c", false, copyUsage)
+
+	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
+	flag.StringVar(&expires, "expires", "1w", expiresUsage)
+	flag.StringVar(&expires, "e", "1w", expiresUsage)
+
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) == 0 {
+		fmt.Println("error: no filename provided.")
+		printUsage()
+		return
+	}
+
+	filename = args[len(args)-1]
+}
+
+func printUsage() {
+	fmt.Println("v8p [arguments] <filename>")
+	fmt.Println()
+	fmt.Println("arguments:")
+	fmt.Println("--password, -p <password>    enables encryption and uses password")
+	fmt.Println("--expires,  -e <date str>    sets the expiry date of the file (-e 1d), (-e 3 weeks), (--expires 5 m)")
+	fmt.Println("--copy,     -c               if present, automatically copies the returned URL to the clipboard")
 }
 
 func parseExpiry(expiryStr string) (int64, error) {
@@ -24,8 +60,6 @@ func parseExpiry(expiryStr string) (int64, error) {
 	unit := strings.ToLower(matches[2])
 	var multiplier float64
 	switch unit {
-	case "s", "sec", "secs", "second", "seconds":
-		multiplier = 1
 	case "m", "min", "mins", "minute", "minutes":
 		multiplier = 60
 	case "h", "hr", "hrs", "hour", "hours":
