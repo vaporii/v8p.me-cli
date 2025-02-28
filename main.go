@@ -20,6 +20,7 @@ var copy bool
 var expiresString string
 var expires int64
 var filename string
+var serverUrl string
 
 const (
 	iterations = 100000
@@ -40,6 +41,10 @@ func main() {
 	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
 	flag.StringVar(&expiresString, "expires", "1w", expiresUsage)
 	flag.StringVar(&expiresString, "e", "1w", expiresUsage)
+
+	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
+	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
+	flag.StringVar(&serverUrl, "s", "https://v8p.me", serverUsage)
 
 	flag.Parse()
 
@@ -149,6 +154,7 @@ func printUsage() {
 	fmt.Println("--password, -p <password>    enables encryption and uses password")
 	fmt.Println("--expires,  -e <date str>    sets the expiry date of the file (-e 1d), (-e 3 weeks), (--expires 5 m)")
 	fmt.Println("--copy,     -c               if present, automatically copies the returned URL to the clipboard")
+	fmt.Println("--server,   -s <url>         directs requests to a custom server instead of https://v8p.me (default)")
 }
 
 func parseExpiry(expiryStr string) (int64, error) {
