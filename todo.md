@@ -1,0 +1,1 @@
+- [ ] warn if duration is less than one minute
