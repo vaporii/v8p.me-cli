@@ -9,10 +9,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"mime"
+	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var password string
@@ -38,7 +43,7 @@ func main() {
 	flag.BoolVar(&copy, "copy", false, copyUsage)
 	flag.BoolVar(&copy, "c", false, copyUsage)
 
-	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
+	const expiresUsage = "set the expiry date after which the file should be deleted (default: 1 week) (-e 1d), (-e 3 weeks), (-e 5 m)"
 	flag.StringVar(&expiresString, "expires", "1w", expiresUsage)
 	flag.StringVar(&expiresString, "e", "1w", expiresUsage)
 
@@ -72,7 +77,89 @@ func main() {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
+		fmt.Println("finished encrypting")
+
+		info, err := os.Stat(filename)
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
+			return
+		}
+
+		err = streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, len(password) > 0, int(expires))
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
+			return
+		}
 	}
+}
+
+func streamFileUpload(filePath, serverUrl string, ogFileInfo os.FileInfo, encrypted bool, expires int) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// writer := multipart.NewWriter(pw)
+
+	// go func() {
+	// 	defer pw.Close()
+	// 	// part, err := writer.CreateFormFile("file", filePath)
+	// 	_, err = io.Copy(part, file)
+	// 	if err != nil {
+	// 		pw.CloseWithError(err)
+	// 		return
+	// 	}
+	// 	writer.Close()
+	// }()
+
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", serverUrl, file)
+	if err != nil {
+		return err
+	}
+
+	fileName := ogFileInfo.Name()
+	ext := filepath.Ext(fileName)
+	fileType := mime.TypeByExtension(ext)
+	if len(fileType) == 0 {
+		fileType = "application/octet-stream"
+	}
+
+	encryptedStr := "0"
+	if encrypted {
+		encryptedStr = "1"
+	}
+
+	req.Header.Set("X-File-Name", url.QueryEscape(fileName))
+	req.Header.Set("X-File-Type", fileType)
+	req.Header.Set("X-File-Size", strconv.Itoa(int(ogFileInfo.Size())))
+	req.Header.Set("X-Encrypted", encryptedStr)
+
+	if expires > 0 {
+		req.Header.Set("X-Expiration-Date", strconv.Itoa(expires+int(time.Now().Unix())))
+	}
+	req.Header.Set("Content-Length", strconv.Itoa(int(info.Size())))
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Response:", string(respBody))
+	return nil
 }
 
 func encryptFile(filename string, password string) error {
@@ -151,10 +238,10 @@ func printUsage() {
 	fmt.Println("v8p [arguments] <filename>")
 	fmt.Println()
 	fmt.Println("arguments:")
-	fmt.Println("--password, -p <password>    enables encryption and uses password")
-	fmt.Println("--expires,  -e <date str>    sets the expiry date of the file (-e 1d), (-e 3 weeks), (--expires 5 m)")
-	fmt.Println("--copy,     -c               if present, automatically copies the returned URL to the clipboard")
-	fmt.Println("--server,   -s <url>         directs requests to a custom server instead of https://v8p.me (default)")
+	fmt.Println("--password, -p <password>    enable encryption and set password")
+	fmt.Println("--expires,  -e <date str>    set expiry date of file (-e 1d), (-e 3 weeks), (--expires 5 m)")
+	fmt.Println("--copy,     -c               if present, automatically copy returned URL to clipboard")
+	fmt.Println("--server,   -s <url>         direct requests to custom server instead of default (https://v8p.me) (-s https://example.com)")
 }
 
 func parseExpiry(expiryStr string) (int64, error) {
