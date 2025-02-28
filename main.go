@@ -24,6 +24,7 @@ const (
 	iterations = 100000
 	chunkSize  = 1 * 1000 * 1000 // 1mb per chunk
 	saltSize   = 16
+	nonceSize  = 12
 )
 
 func main() {
@@ -58,6 +59,14 @@ func main() {
 	_ = expires
 
 	filename = args[len(args)-1]
+
+	if len(password) > 0 {
+		err := encryptFile(filename, password)
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
+			return
+		}
+	}
 }
 
 func encryptFile(filename string, password string) error {
@@ -67,7 +76,7 @@ func encryptFile(filename string, password string) error {
 	}
 	defer file.Close()
 
-	outFile, err := os.Open("/tmp/v8p.me-cli")
+	outFile, err := os.Open("v8p.me-cli.tmp")
 	if err != nil {
 		return err
 	}
@@ -100,8 +109,27 @@ func encryptFile(filename string, password string) error {
 		if err != nil {
 			return err
 		}
+		if n == 0 {
+			break
+		}
+		plaintext := buf[:n]
 
+		nonce := make([]byte, nonceSize)
+		if _, err := rand.Read(nonce); err != nil {
+			return err
+		}
+
+		ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+
+		if _, err := outFile.Write(nonce); err != nil {
+			return err
+		}
+		if _, err := outFile.Write(ciphertext); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func deriveKey(password string, salt []byte, iterations int) ([]byte, error) {
