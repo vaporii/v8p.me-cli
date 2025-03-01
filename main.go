@@ -52,6 +52,10 @@ func main() {
 	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
 	flag.StringVar(&serverUrl, "s", "https://v8p.me", serverUsage)
 
+	flag.Usage = func() {
+		printUsage()
+	}
+
 	flag.Parse()
 
 	args := flag.Args()

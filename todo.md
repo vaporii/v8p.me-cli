@@ -1,1 +1,1 @@
-- [ ] warn if duration is less than one minute
+- [ ] progress bars (those fancy ones)
