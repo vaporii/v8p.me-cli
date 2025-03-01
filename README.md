@@ -25,16 +25,25 @@ then, you can move the `v8p` executable anywhere you'd like and/or add the follo
 ### usage
 
 ```
-v8p [arguments] <filename>
+usage: v8p [options] <filename>
 
-arguments:
---password, -p <password>    enable encryption and set password
---expires,  -e <date str>    set expiry date of file (-e 1d), (-e 3weeks), (--expires \"5 minutes\")
---copy,     -c               if present, automatically copy returned URL to clipboard
---server,   -s <url>         direct requests to custom server instead of default (https://v8p.me) (-s https://example.com)
+options:
+  general:
+    --server,   -s <url>         set custom server instead of default (https://v8p.me)
+    --copy,     -c               automatically copy returned URL to clipboard
+
+  security:
+    --password, -p <password>    enable encryption and set password
+    --expires,  -e <date str>    set expiry date of file (e.g., -e 1d, -e "5 minutes")
+
+  upload behavior:
+    --filename, -f <name>        override filename sent to server
+
+  output control:
+    --quiet,    -q               suppress all output except the URL
 
 examples:
-v8p -c -p Password123! -e \"5 days\" image.png
-v8p --copy --password=\"Cr3d3nt1a1$\" text.txt
+v8p -c -p Password123! -e "5 days" image.png
+v8p --copy --password="Cr3d3nt1a1$" text.txt
 v8p -e 1h -c video.mkv
 ```
