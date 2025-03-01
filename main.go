@@ -6,6 +6,7 @@ import (
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -43,9 +44,9 @@ func main() {
 	flag.BoolVar(&copy, "copy", false, copyUsage)
 	flag.BoolVar(&copy, "c", false, copyUsage)
 
-	const expiresUsage = "set the expiry date after which the file should be deleted (default: 1 week) (-e 1d), (-e 3 weeks), (-e 5 m)"
-	flag.StringVar(&expiresString, "expires", "1w", expiresUsage)
-	flag.StringVar(&expiresString, "e", "1w", expiresUsage)
+	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
+	flag.StringVar(&expiresString, "expires", "0m", expiresUsage)
+	flag.StringVar(&expiresString, "e", "0m", expiresUsage)
 
 	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
 	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
@@ -77,7 +78,6 @@ func main() {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
-		fmt.Println("finished encrypting")
 
 		info, err := os.Stat(filename)
 		if err != nil {
@@ -93,32 +93,19 @@ func main() {
 	}
 }
 
-func streamFileUpload(filePath, serverUrl string, ogFileInfo os.FileInfo, encrypted bool, expires int) error {
+func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypted bool, expires int) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// writer := multipart.NewWriter(pw)
-
-	// go func() {
-	// 	defer pw.Close()
-	// 	// part, err := writer.CreateFormFile("file", filePath)
-	// 	_, err = io.Copy(part, file)
-	// 	if err != nil {
-	// 		pw.CloseWithError(err)
-	// 		return
-	// 	}
-	// 	writer.Close()
-	// }()
-
 	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", serverUrl, file)
+	req, err := http.NewRequest("POST", apiPath, file)
 	if err != nil {
 		return err
 	}
@@ -158,7 +145,11 @@ func streamFileUpload(filePath, serverUrl string, ogFileInfo os.FileInfo, encryp
 		return err
 	}
 
-	fmt.Println("Response:", string(respBody))
+	if resp.StatusCode >= 400 {
+		return errors.New("unexpected error: " + resp.Status)
+	}
+
+	fmt.Println(serverUrl + "/" + string(respBody))
 	return nil
 }
 
