@@ -39,21 +39,21 @@ const (
 )
 
 func main() {
-	const passwordUsage = "enable encryption and set a password (-p <password>)"
-	flag.StringVar(&password, "password", "", passwordUsage)
-	flag.StringVar(&password, "p", "", passwordUsage)
+	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
+	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
+	flag.StringVar(&serverUrl, "s", "https://v8p.me", serverUsage)
 
 	const copyUsage = "copy the resulting url to the clipboard (-c)"
 	flag.BoolVar(&copy, "copy", false, copyUsage)
 	flag.BoolVar(&copy, "c", false, copyUsage)
 
+	const passwordUsage = "enable encryption and set a password (-p <password>)"
+	flag.StringVar(&password, "password", "", passwordUsage)
+	flag.StringVar(&password, "p", "", passwordUsage)
+
 	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
 	flag.StringVar(&expiresString, "expires", "0m", expiresUsage)
 	flag.StringVar(&expiresString, "e", "0m", expiresUsage)
-
-	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
-	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
-	flag.StringVar(&serverUrl, "s", "https://v8p.me", serverUsage)
 
 	flag.Usage = func() {
 		printUsage()
