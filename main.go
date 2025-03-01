@@ -244,7 +244,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("arguments:")
 	fmt.Println("--password, -p <password>    enable encryption and set password")
-	fmt.Println("--expires,  -e <date str>    set expiry date of file (-e 1d), (-e 3 weeks), (--expires 5 m)")
+	fmt.Println("--expires,  -e <date str>    set expiry date of file (-e 1d), (-e 3weeks), (--expires \"5 minutes\")")
 	fmt.Println("--copy,     -c               if present, automatically copy returned URL to clipboard")
 	fmt.Println("--server,   -s <url>         direct requests to custom server instead of default (https://v8p.me) (-s https://example.com)")
 }
