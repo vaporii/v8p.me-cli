@@ -118,9 +118,8 @@ func main() {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
-		fmt.Println()
 		fmt.Println("upload complete!")
-		fmt.Printf("\033[1m%s\033[0m\n", downloadUrl)
+		fmt.Printf("%s\033[0m\n", downloadUrl)
 
 		err = os.Remove("v8p.me-cli.tmp")
 		if err != nil {
@@ -142,7 +141,7 @@ func main() {
 			return
 		}
 		fmt.Println("upload complete!")
-		fmt.Printf("\033[1m%s\033[0m\n", downloadUrl)
+		fmt.Printf("%s\033[0m\n", downloadUrl)
 	}
 }
 
@@ -204,15 +203,17 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 		return "", errors.New("unexpected error: " + resp.Status)
 	}
 
+	messageText := ""
 	if copy {
 		err := clipboard.WriteAll(serverUrl + "/" + string(respBody))
 		if err != nil {
 			return "", err
 		}
-		fmt.Println("(wrote to clipboard)")
+		fmt.Println()
+		messageText = "(wrote to clipboard)\n\033[1m"
 	}
 
-	return serverUrl + "/" + string(respBody), nil
+	return messageText + serverUrl + "/" + string(respBody), nil
 }
 
 func encryptFile(filename string, password string, progressBar *progressbar.ProgressBar) error {
