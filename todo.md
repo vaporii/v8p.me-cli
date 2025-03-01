@@ -1,2 +1,4 @@
 - [x] progress bars (those fancy ones)
 - [ ] file downloading
+- [ ] noupload flag that just saves encrypted file to disk
+- [ ] dry run flag
