@@ -89,7 +89,7 @@ func main() {
 			return
 		}
 
-		err = streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, len(password) > 0, int(expires))
+		err = streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, true, int(expires))
 		if err != nil {
 			fmt.Println("error occured:", err.Error())
 			return
@@ -98,6 +98,18 @@ func main() {
 		err = os.Remove("v8p.me-cli.tmp")
 		if err != nil {
 			fmt.Println("error while deleting file:", err.Error())
+			return
+		}
+	} else {
+		info, err := os.Stat(filename)
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
+			return
+		}
+
+		err = streamFileUpload(filename, serverUrl+"/api", info, false, int(expires))
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
 			return
 		}
 	}
