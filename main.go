@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
+	"github.com/schollz/progressbar/v3"
 )
 
 var password string
@@ -76,24 +77,50 @@ func main() {
 
 	filename = args[len(args)-1]
 
+	info, err := os.Stat(filename)
+	if err != nil {
+		fmt.Println("error occured:", err.Error())
+		return
+	}
+
 	if len(password) > 0 {
-		err := encryptFile(filename, password)
+		bar := progressbar.NewOptions(int(info.Size()),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
+
+		err := encryptFile(filename, password, bar)
+		fmt.Println()
+		if err != nil {
+			fmt.Println("error occured:", err.Error())
+			return
+		}
+		fmt.Println()
+		fmt.Println("encryption complete! initializing upload...")
+
+		newInfo, err := os.Stat("v8p.me-cli.tmp")
 		if err != nil {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
 
-		info, err := os.Stat(filename)
-		if err != nil {
-			fmt.Println("error occured:", err.Error())
-			return
-		}
+		bar = progressbar.NewOptions(int(newInfo.Size()),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionShowTotalBytes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetDescription("[cyan][2/2][reset] uploading file..."))
 
-		err = streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, true, int(expires))
+		downloadUrl, err := streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, true, int(expires), bar)
+		fmt.Println()
 		if err != nil {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
+		fmt.Println()
+		fmt.Println("upload complete!")
+		fmt.Printf("\033[1m%s\033[0m\n", downloadUrl)
 
 		err = os.Remove("v8p.me-cli.tmp")
 		if err != nil {
@@ -101,35 +128,41 @@ func main() {
 			return
 		}
 	} else {
-		info, err := os.Stat(filename)
-		if err != nil {
-			fmt.Println("error occured:", err.Error())
-			return
-		}
+		bar := progressbar.NewOptions(int(info.Size()),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionShowTotalBytes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetDescription("[cyan][1/1][reset] uploading file..."))
 
-		err = streamFileUpload(filename, serverUrl+"/api", info, false, int(expires))
+		downloadUrl, err := streamFileUpload(filename, serverUrl+"/api", info, false, int(expires), bar)
+		fmt.Println()
 		if err != nil {
 			fmt.Println("error occured:", err.Error())
 			return
 		}
+		fmt.Println("upload complete!")
+		fmt.Printf("\033[1m%s\033[0m\n", downloadUrl)
 	}
 }
 
-func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypted bool, expires int) error {
+func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypted bool, expires int, bar *progressbar.ProgressBar) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
 	info, err := file.Stat()
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	req, err := http.NewRequest("POST", apiPath, file)
+	reader := io.TeeReader(file, bar)
+
+	req, err := http.NewRequest("POST", apiPath, reader)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fileName := ogFileInfo.Name()
@@ -158,32 +191,31 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if resp.StatusCode >= 400 {
-		return errors.New("unexpected error: " + resp.Status)
+		return "", errors.New("unexpected error: " + resp.Status)
 	}
 
-	fmt.Println(serverUrl + "/" + string(respBody))
 	if copy {
 		err := clipboard.WriteAll(serverUrl + "/" + string(respBody))
 		if err != nil {
-			return err
+			return "", err
 		}
 		fmt.Println("(wrote to clipboard)")
 	}
 
-	return nil
+	return serverUrl + "/" + string(respBody), nil
 }
 
-func encryptFile(filename string, password string) error {
+func encryptFile(filename string, password string, progressBar *progressbar.ProgressBar) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -223,6 +255,11 @@ func encryptFile(filename string, password string) error {
 		if err != nil && err != io.EOF {
 			return err
 		}
+		err = progressBar.Add(n)
+		if err != nil {
+			return err
+		}
+
 		if n == 0 {
 			break
 		}

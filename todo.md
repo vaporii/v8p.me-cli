@@ -1,2 +1,2 @@
-- [ ] progress bars (those fancy ones)
+- [x] progress bars (those fancy ones)
 - [ ] file downloading
