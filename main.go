@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/atotto/clipboard"
 )
 
 var password string
@@ -154,6 +156,14 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 	}
 
 	fmt.Println(serverUrl + "/" + string(respBody))
+	if copy {
+		err := clipboard.WriteAll(serverUrl + "/" + string(respBody))
+		if err != nil {
+			return err
+		}
+		fmt.Println("(wrote to clipboard)")
+	}
+
 	return nil
 }
 
