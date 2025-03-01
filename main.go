@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"net/url"
@@ -40,6 +41,8 @@ const (
 )
 
 func main() {
+	log.SetFlags(0)
+
 	customFilename := ""
 
 	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
@@ -74,14 +77,18 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Println("error: no filename provided.")
+		log.Println("error: no filename provided.")
 		printUsage()
 		return
 	}
 
+	if suppressOutput {
+		log.SetOutput(io.Discard)
+	}
+
 	expires, err := parseExpiry(expiresString)
 	if err != nil {
-		fmt.Println("error: could not parse expiry")
+		log.Println("error: could not parse expiry")
 		printUsage()
 		return
 	}
@@ -90,8 +97,14 @@ func main() {
 
 	info, err := os.Stat(filename)
 	if err != nil {
-		fmt.Println("error occured:", err.Error())
+		log.Println("error occured:", err.Error())
 		return
+	}
+
+	serverFilename := info.Name()
+
+	if len(customFilename) > 0 {
+		serverFilename = customFilename
 	}
 
 	if len(password) > 0 {
@@ -99,20 +112,21 @@ func main() {
 			progressbar.OptionShowBytes(true),
 			progressbar.OptionEnableColorCodes(true),
 			progressbar.OptionShowCount(),
+			progressbar.OptionSetVisibility(!suppressOutput),
 			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
 
 		err := encryptFile(filename, password, bar)
-		fmt.Println()
+		log.Println()
 		if err != nil {
-			fmt.Println("error occured:", err.Error())
+			log.Println("error occured:", err.Error())
 			return
 		}
-		fmt.Println()
-		fmt.Println("encryption complete! initializing upload...")
+		log.Println()
+		log.Println("encryption complete! initializing upload...")
 
 		newInfo, err := os.Stat("v8p.me-cli.tmp")
 		if err != nil {
-			fmt.Println("error occured:", err.Error())
+			log.Println("error occured:", err.Error())
 			return
 		}
 
@@ -121,20 +135,21 @@ func main() {
 			progressbar.OptionEnableColorCodes(true),
 			progressbar.OptionShowTotalBytes(true),
 			progressbar.OptionShowCount(),
+			progressbar.OptionSetVisibility(!suppressOutput),
 			progressbar.OptionSetDescription("[cyan][2/2][reset] uploading file..."))
 
-		downloadUrl, err := streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, true, int(expires), bar)
-		fmt.Println()
+		downloadUrl, err := streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, serverFilename, true, int(expires), bar)
 		if err != nil {
-			fmt.Println("error occured:", err.Error())
+			log.Println("error occured:", err.Error())
 			return
 		}
-		fmt.Println("upload complete!")
-		fmt.Printf("%s\033[0m\n", downloadUrl)
+		log.Print("\033[1m")
+		fmt.Printf("%s", downloadUrl)
+		log.Print("\033[0m")
 
 		err = os.Remove("v8p.me-cli.tmp")
 		if err != nil {
-			fmt.Println("error while deleting file:", err.Error())
+			log.Println("error while deleting file:", err.Error())
 			return
 		}
 	} else {
@@ -145,18 +160,18 @@ func main() {
 			progressbar.OptionShowCount(),
 			progressbar.OptionSetDescription("[cyan][1/1][reset] uploading file..."))
 
-		downloadUrl, err := streamFileUpload(filename, serverUrl+"/api", info, false, int(expires), bar)
-		fmt.Println()
+		downloadUrl, err := streamFileUpload(filename, serverUrl+"/api", info, serverFilename, false, int(expires), bar)
+		log.Println()
 		if err != nil {
-			fmt.Println("error occured:", err.Error())
+			log.Println("error occured:", err.Error())
 			return
 		}
-		fmt.Println("upload complete!")
-		fmt.Printf("%s\033[0m\n", downloadUrl)
+		log.Println("upload complete!")
+		log.Printf("%s\033[0m\n", downloadUrl)
 	}
 }
 
-func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypted bool, expires int, bar *progressbar.ProgressBar) (string, error) {
+func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, serverFilename string, encrypted bool, expires int, bar *progressbar.ProgressBar) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err
@@ -175,8 +190,7 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 		return "", err
 	}
 
-	fileName := ogFileInfo.Name()
-	ext := filepath.Ext(fileName)
+	ext := filepath.Ext(serverFilename)
 	fileType := mime.TypeByExtension(ext)
 	if len(fileType) == 0 {
 		fileType = "application/octet-stream"
@@ -187,7 +201,7 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 		encryptedStr = "1"
 	}
 
-	req.Header.Set("X-File-Name", url.QueryEscape(fileName))
+	req.Header.Set("X-File-Name", url.QueryEscape(serverFilename))
 	req.Header.Set("X-File-Type", fileType)
 	req.Header.Set("X-File-Size", strconv.Itoa(int(ogFileInfo.Size())))
 	req.Header.Set("X-Encrypted", encryptedStr)
@@ -214,17 +228,18 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, encrypte
 		return "", errors.New("unexpected error: " + resp.Status)
 	}
 
-	messageText := ""
 	if copy {
 		err := clipboard.WriteAll(serverUrl + "/" + string(respBody))
 		if err != nil {
 			return "", err
 		}
-		fmt.Println()
-		messageText = "(wrote to clipboard)\n\033[1m"
+		log.Println()
+		log.Println()
+		log.Println("upload complete!")
+		log.Println("(wrote to clipboard)")
 	}
 
-	return messageText + serverUrl + "/" + string(respBody), nil
+	return serverUrl + "/" + string(respBody), nil
 }
 
 func encryptFile(filename string, password string, progressBar *progressbar.ProgressBar) error {
@@ -305,34 +320,34 @@ func deriveKey(password string, salt []byte, iterations int) ([]byte, error) {
 }
 
 func printUsage() {
-	fmt.Println("usage: v8p [options] <filename>")
-	fmt.Println()
-	fmt.Println("options:")
-	fmt.Println("  general:")
-	fmt.Println("    --server,   -s <url>         set custom server instead of default (https://v8p.me)")
-	fmt.Println("    --copy,     -c               automatically copy returned URL to clipboard")
-	fmt.Println()
-	fmt.Println("  security:")
-	fmt.Println("    --password, -p <password>    enable encryption and set password")
-	fmt.Println("    --expires,  -e <date str>    set expiry date of file (e.g., -e 1d, -e \"5 minutes\")")
-	fmt.Println()
-	fmt.Println("  upload behavior:")
-	fmt.Println("    --filename, -f <name>        override filename sent to server")
-	fmt.Println()
-	fmt.Println("  output control:")
-	fmt.Println("    --quiet,    -q               suppress all output except the URL")
-	fmt.Println()
-	fmt.Println("examples:")
-	fmt.Println("v8p -c -p Password123! -e \"5 days\" image.png")
-	fmt.Println("v8p --copy --password=\"Cr3d3nt1a1$\" text.txt")
-	fmt.Println("v8p -e 1h -c video.mkv")
+	log.Println("usage: v8p [options] <filename>")
+	log.Println()
+	log.Println("options:")
+	log.Println("  general:")
+	log.Println("    --server,   -s <url>         set custom server instead of default (https://v8p.me)")
+	log.Println("    --copy,     -c               automatically copy returned URL to clipboard")
+	log.Println()
+	log.Println("  security:")
+	log.Println("    --password, -p <password>    enable encryption and set password")
+	log.Println("    --expires,  -e <date str>    set expiry date of file (e.g., -e 1d, -e \"5 minutes\")")
+	log.Println()
+	log.Println("  upload behavior:")
+	log.Println("    --filename, -f <name>        override filename sent to server")
+	log.Println()
+	log.Println("  output control:")
+	log.Println("    --quiet,    -q               suppress all output except the URL")
+	log.Println()
+	log.Println("examples:")
+	log.Println("v8p -c -p Password123! -e \"5 days\" image.png")
+	log.Println("v8p --copy --password=\"Cr3d3nt1a1$\" text.txt")
+	log.Println("v8p -e 1h -c video.mkv")
 }
 
 func parseExpiry(expiryStr string) (int64, error) {
 	re := regexp.MustCompile(`^([\d.]+)\s*([a-zA-Z]+)$`)
 	matches := re.FindStringSubmatch(strings.TrimSpace(expiryStr))
 	if matches == nil {
-		return 0, fmt.Errorf("could not parse expiry string: %s", expiryStr)
+		return 0, errors.New("could not parse expiry string: " + expiryStr)
 	}
 	value, err := strconv.ParseFloat(matches[1], 64)
 	if err != nil {
@@ -354,7 +369,7 @@ func parseExpiry(expiryStr string) (int64, error) {
 	case "y", "yr", "year", "years":
 		multiplier = 31557600
 	default:
-		return 0, fmt.Errorf("unknown time unit: %s", unit)
+		return 0, errors.New("unknown time unit: " + unit)
 	}
 	return int64(value * multiplier), nil
 }
