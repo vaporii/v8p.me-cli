@@ -74,8 +74,6 @@ func main() {
 		return
 	}
 
-	_ = expires
-
 	filename = args[len(args)-1]
 
 	if len(password) > 0 {
@@ -94,6 +92,12 @@ func main() {
 		err = streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, len(password) > 0, int(expires))
 		if err != nil {
 			fmt.Println("error occured:", err.Error())
+			return
+		}
+
+		err = os.Remove("v8p.me-cli.tmp")
+		if err != nil {
+			fmt.Println("error while deleting file:", err.Error())
 			return
 		}
 	}
@@ -247,6 +251,11 @@ func printUsage() {
 	fmt.Println("--expires,  -e <date str>    set expiry date of file (-e 1d), (-e 3weeks), (--expires \"5 minutes\")")
 	fmt.Println("--copy,     -c               if present, automatically copy returned URL to clipboard")
 	fmt.Println("--server,   -s <url>         direct requests to custom server instead of default (https://v8p.me) (-s https://example.com)")
+	fmt.Println()
+	fmt.Println("examples:")
+	fmt.Println("v8p -c -p Password123! -e \"5 days\" image.png")
+	fmt.Println("v8p --copy --password=\"Cr3d3nt1a1$\" text.txt")
+	fmt.Println("v8p -e 1h -c video.mkv")
 }
 
 func parseExpiry(expiryStr string) (int64, error) {
