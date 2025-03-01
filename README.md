@@ -15,12 +15,12 @@ git clone https://github.com/vaporii/v8p.me-cli
 cd v8p.me-cli
 
 go mod tidy
-go build -o v8p
+go build -o build/v8p
 ```
 
-then, you can move the `v8p` executable anywhere you'd like and/or add the following to your .zshrc or .bashrc (replacing `/path/to/executable` with the directory containing your executable):
+then, you can move the `v8p` executable anywhere you'd like and/or add the following to your .zshrc or .bashrc (replacing `/path/to/executable/build` with the directory containing your executable):
 
-`export PATH="/path/to/executable:$PATH"`
+`export PATH="/path/to/executable/build:$PATH"`
 
 ### usage
 
