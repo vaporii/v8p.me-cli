@@ -19,6 +19,7 @@ go build -o v8p
 ```
 
 then, you can move the `v8p` executable anywhere you'd like and/or add the following to your .zshrc or .bashrc (replacing `/path/to/executable` with the directory containing your executable):
+
 `export PATH="/path/to/executable:$PATH"`
 
 ### usage
