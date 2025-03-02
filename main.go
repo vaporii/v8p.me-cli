@@ -33,6 +33,8 @@ var filename string
 var serverUrl string
 var suppressOutput bool
 
+var encryptedFilename string = "v8p.me-cli.tmp"
+
 const (
 	iterations = 100000
 	chunkSize  = 1 * 1000 * 1000 // 1mb per chunk
@@ -44,6 +46,7 @@ func main() {
 	log.SetFlags(0)
 
 	customFilename := ""
+	dryFilename := ""
 
 	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
 	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
@@ -69,6 +72,10 @@ func main() {
 	flag.BoolVar(&suppressOutput, "quiet", false, quietUsage)
 	flag.BoolVar(&suppressOutput, "q", false, quietUsage)
 
+	const dryUsage = "skip upload and save encrypted file to disk as specified filename"
+	flag.StringVar(&dryFilename, "dry", "", dryUsage)
+	flag.StringVar(&dryFilename, "d", "", dryUsage)
+
 	flag.Usage = func() {
 		printUsage()
 	}
@@ -84,6 +91,10 @@ func main() {
 
 	if suppressOutput {
 		log.SetOutput(io.Discard)
+	}
+
+	if len(dryFilename) > 0 {
+		encryptedFilename = dryFilename
 	}
 
 	expires, err := parseExpiry(expiresString)
@@ -122,9 +133,14 @@ func main() {
 			return
 		}
 		log.Println()
+
+		if len(dryFilename) > 0 {
+			log.Println("encryption complete!")
+			return
+		}
 		log.Println("encryption complete! initializing upload...")
 
-		newInfo, err := os.Stat("v8p.me-cli.tmp")
+		newInfo, err := os.Stat(encryptedFilename)
 		if err != nil {
 			log.Println("error occured:", err.Error())
 			return
@@ -138,7 +154,7 @@ func main() {
 			progressbar.OptionSetVisibility(!suppressOutput),
 			progressbar.OptionSetDescription("[cyan][2/2][reset] uploading file..."))
 
-		downloadUrl, err := streamFileUpload("v8p.me-cli.tmp", serverUrl+"/api", info, serverFilename, true, int(expires), bar)
+		downloadUrl, err := streamFileUpload(encryptedFilename, serverUrl+"/api", info, serverFilename, true, int(expires), bar)
 		if err != nil {
 			log.Println("error occured:", err.Error())
 			return
@@ -147,7 +163,7 @@ func main() {
 		fmt.Printf("%s", downloadUrl)
 		log.Print("\033[0m")
 
-		err = os.Remove("v8p.me-cli.tmp")
+		err = os.Remove(encryptedFilename)
 		if err != nil {
 			log.Println("error while deleting file:", err.Error())
 			return
@@ -249,7 +265,7 @@ func encryptFile(filename string, password string, progressBar *progressbar.Prog
 	}
 	defer file.Close()
 
-	outFile, err := os.Create("v8p.me-cli.tmp")
+	outFile, err := os.Create(encryptedFilename)
 	if err != nil {
 		return err
 	}
@@ -333,6 +349,7 @@ func printUsage() {
 	log.Println()
 	log.Println("  upload behavior:")
 	log.Println("    --filename, -f <name>        override filename sent to server")
+	log.Println("    --dry,      -d <filename>    skip upload and save encrypted file to disk as specified filename")
 	log.Println()
 	log.Println("  output control:")
 	log.Println("    --quiet,    -q               suppress all output except the URL")

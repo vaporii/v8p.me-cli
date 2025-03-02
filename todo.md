@@ -2,3 +2,4 @@
 - [ ] file downloading
 - [ ] noupload flag that just saves encrypted file to disk
 - [ ] dry run flag
+- [ ] check if file exists before creating and removing (give an `file 'filename.txt' exists. overwrite? [N/y] `)
