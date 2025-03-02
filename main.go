@@ -91,7 +91,7 @@ func parseFlags() (*config, error) {
 }
 
 func main() {
-	encryptedFilename := "v8p.me-cli.tmp"
+	toUploadFile := "v8p.me-cli.tmp"
 
 	log.SetFlags(0)
 
@@ -107,7 +107,7 @@ func main() {
 	}
 
 	if len(cfg.dryFilename) > 0 {
-		encryptedFilename = cfg.dryFilename
+		toUploadFile = cfg.dryFilename
 	}
 
 	expires, err := parseExpiry(cfg.expiresString)
@@ -137,7 +137,7 @@ func main() {
 			progressbar.OptionSetVisibility(!cfg.suppressOutput),
 			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
 
-		err := encryptFile(cfg.filePath, encryptedFilename, cfg.password, bar)
+		err := encryptFile(cfg.filePath, toUploadFile, cfg.password, bar)
 		log.Println()
 		if err != nil {
 			log.Println("error occured:", err.Error())
@@ -152,11 +152,13 @@ func main() {
 
 		log.Println("encryption complete! initializing upload...")
 
-		info, err = os.Stat(encryptedFilename)
+		info, err = os.Stat(toUploadFile)
 		if err != nil {
 			log.Println("error occured:", err.Error())
 			return
 		}
+	} else {
+		toUploadFile = cfg.filePath
 	}
 
 	optionStr := "[2/2]"
@@ -172,7 +174,7 @@ func main() {
 		progressbar.OptionSetVisibility(!cfg.suppressOutput),
 		progressbar.OptionSetDescription("[cyan]"+optionStr+"[reset] uploading file..."))
 
-	alias, err := streamFileUpload(encryptedFilename, cfg.serverUrl+"/api", info, serverFilename, isEncrypting, int(expires), bar)
+	alias, err := streamFileUpload(toUploadFile, cfg.serverUrl+"/api", info, serverFilename, isEncrypting, int(expires), bar)
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
@@ -201,7 +203,7 @@ func main() {
 	log.Print("\033[0m")
 
 	if isEncrypting {
-		err = os.Remove(encryptedFilename)
+		err = os.Remove(toUploadFile)
 		if err != nil {
 			log.Println("error while deleting file:", err.Error())
 			return
