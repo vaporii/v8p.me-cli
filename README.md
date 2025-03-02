@@ -2,6 +2,8 @@
 
 a cli tool for encrypting and uploading files for v8p.me
 
+![demo](https://github.com/user-attachments/assets/dda4d2a2-5ac3-4586-ae47-757c1daee107)
+
 ### installation
 
 dependencies:
