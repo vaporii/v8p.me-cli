@@ -38,7 +38,7 @@ options:
 
   upload behavior:
     --filename, -f <name>        override filename sent to server
-	  --dry,      -d <filename>    skip upload and save encrypted file to disk as specified filename
+    --dry,      -d <filename>    skip upload and save encrypted file to disk as specified filename
 
   output control:
     --quiet,    -q               suppress all output except the URL
