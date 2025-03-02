@@ -1,6 +1,6 @@
 # v8p.me-cli
 
-a cli tool for uploading files for v8p.me
+a cli tool for encrypting and uploading files for v8p.me
 
 ### installation
 
