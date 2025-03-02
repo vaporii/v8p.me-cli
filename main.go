@@ -25,16 +25,18 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-var password string
-var copy bool
-var expiresString string
-var expires int64
-var filename string
-var serverUrl string
-var suppressOutput bool
+type config struct {
+	serverUrl      string
+	copy           bool
+	password       string
+	expiresString  string
+	customFilename string
+	dryFilename    string
+	suppressOutput bool
+	filePath       string
+}
 
-var encryptedFilename string = "v8p.me-cli.tmp"
-
+// encryption params
 const (
 	iterations = 100000
 	chunkSize  = 1 * 1000 * 1000 // 1mb per chunk
@@ -42,39 +44,36 @@ const (
 	nonceSize  = 12
 )
 
-func main() {
-	log.SetFlags(0)
+func parseFlags() (*config, error) {
+	cfg := &config{}
 
-	customFilename := ""
-	dryFilename := ""
+	const serverUsage = "set custom server instead of default (https://v8p.me)"
+	flag.StringVar(&cfg.serverUrl, "server", "https://v8p.me", serverUsage)
+	flag.StringVar(&cfg.serverUrl, "s", "https://v8p.me", serverUsage)
 
-	const serverUsage = "directs requests to a custom server instead of default of https://v8p.me (-s <url>)"
-	flag.StringVar(&serverUrl, "server", "https://v8p.me", serverUsage)
-	flag.StringVar(&serverUrl, "s", "https://v8p.me", serverUsage)
+	const copyUsage = "automatically copy returned URL to clipboard"
+	flag.BoolVar(&cfg.copy, "copy", false, copyUsage)
+	flag.BoolVar(&cfg.copy, "c", false, copyUsage)
 
-	const copyUsage = "copy the resulting url to the clipboard (-c)"
-	flag.BoolVar(&copy, "copy", false, copyUsage)
-	flag.BoolVar(&copy, "c", false, copyUsage)
+	const passwordUsage = "enable encryption and set password"
+	flag.StringVar(&cfg.password, "password", "", passwordUsage)
+	flag.StringVar(&cfg.password, "p", "", passwordUsage)
 
-	const passwordUsage = "enable encryption and set a password (-p <password>)"
-	flag.StringVar(&password, "password", "", passwordUsage)
-	flag.StringVar(&password, "p", "", passwordUsage)
-
-	const expiresUsage = "set the expiry date after which the file should be deleted (-e 1d), (-e 3 weeks), (-e 5 m)"
-	flag.StringVar(&expiresString, "expires", "0m", expiresUsage)
-	flag.StringVar(&expiresString, "e", "0m", expiresUsage)
+	const expiresUsage = "set expiry date of file (e.g., -e 1d, -e \"5 minutes\")"
+	flag.StringVar(&cfg.expiresString, "expires", "0m", expiresUsage)
+	flag.StringVar(&cfg.expiresString, "e", "0m", expiresUsage)
 
 	const filenameUsage = "override filename sent to server"
-	flag.StringVar(&customFilename, "filename", "", filenameUsage)
-	flag.StringVar(&customFilename, "f", "", filenameUsage)
-
-	const quietUsage = "suppress all output except the URL"
-	flag.BoolVar(&suppressOutput, "quiet", false, quietUsage)
-	flag.BoolVar(&suppressOutput, "q", false, quietUsage)
+	flag.StringVar(&cfg.customFilename, "filename", "", filenameUsage)
+	flag.StringVar(&cfg.customFilename, "f", "", filenameUsage)
 
 	const dryUsage = "skip upload and save encrypted file to disk as specified filename"
-	flag.StringVar(&dryFilename, "dry", "", dryUsage)
-	flag.StringVar(&dryFilename, "d", "", dryUsage)
+	flag.StringVar(&cfg.dryFilename, "dry", "", dryUsage)
+	flag.StringVar(&cfg.dryFilename, "d", "", dryUsage)
+
+	const quietUsage = "suppress all output except the URL"
+	flag.BoolVar(&cfg.suppressOutput, "quiet", false, quietUsage)
+	flag.BoolVar(&cfg.suppressOutput, "q", false, quietUsage)
 
 	flag.Usage = func() {
 		printUsage()
@@ -84,49 +83,61 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		log.Println("error: no filename provided.")
+		return nil, errors.New("error: no filename provided")
+	}
+	cfg.filePath = args[len(args)-1]
+
+	return cfg, nil
+}
+
+func main() {
+	encryptedFilename := "v8p.me-cli.tmp"
+
+	log.SetFlags(0)
+
+	cfg, err := parseFlags()
+	if err != nil {
+		log.Println(err.Error())
 		printUsage()
 		return
 	}
 
-	if suppressOutput {
+	if cfg.suppressOutput {
 		log.SetOutput(io.Discard)
 	}
 
-	if len(dryFilename) > 0 {
-		encryptedFilename = dryFilename
+	if len(cfg.dryFilename) > 0 {
+		encryptedFilename = cfg.dryFilename
 	}
 
-	expires, err := parseExpiry(expiresString)
+	expires, err := parseExpiry(cfg.expiresString)
 	if err != nil {
-		log.Println("error: could not parse expiry")
+		log.Println(err.Error())
 		printUsage()
 		return
 	}
 
-	filename = args[len(args)-1]
-
-	info, err := os.Stat(filename)
+	info, err := os.Stat(cfg.filePath)
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
 	}
 
 	serverFilename := info.Name()
-
-	if len(customFilename) > 0 {
-		serverFilename = customFilename
+	if len(cfg.customFilename) > 0 {
+		serverFilename = cfg.customFilename
 	}
 
-	if len(password) > 0 {
+	isEncrypting := len(cfg.password) > 0
+	if isEncrypting {
 		bar := progressbar.NewOptions(int(info.Size()),
 			progressbar.OptionShowBytes(true),
 			progressbar.OptionEnableColorCodes(true),
 			progressbar.OptionShowCount(),
-			progressbar.OptionSetVisibility(!suppressOutput),
+			progressbar.OptionSetVisibility(!cfg.suppressOutput),
 			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
 
-		err := encryptFile(filename, password, bar)
+		err := encryptFile(cfg.filePath, encryptedFilename, cfg.password, bar)
 		log.Println()
 		if err != nil {
 			log.Println("error occured:", err.Error())
@@ -134,60 +145,71 @@ func main() {
 		}
 		log.Println()
 
-		if len(dryFilename) > 0 {
+		if len(cfg.dryFilename) > 0 {
 			log.Println("encryption complete!")
 			return
 		}
+
 		log.Println("encryption complete! initializing upload...")
 
-		newInfo, err := os.Stat(encryptedFilename)
+		info, err = os.Stat(encryptedFilename)
 		if err != nil {
 			log.Println("error occured:", err.Error())
 			return
 		}
+	}
 
-		bar = progressbar.NewOptions(int(newInfo.Size()),
-			progressbar.OptionShowBytes(true),
-			progressbar.OptionEnableColorCodes(true),
-			progressbar.OptionShowTotalBytes(true),
-			progressbar.OptionShowCount(),
-			progressbar.OptionSetVisibility(!suppressOutput),
-			progressbar.OptionSetDescription("[cyan][2/2][reset] uploading file..."))
+	optionStr := "[2/2]"
+	if !isEncrypting {
+		optionStr = "[1/1]"
+	}
 
-		downloadUrl, err := streamFileUpload(encryptedFilename, serverUrl+"/api", info, serverFilename, true, int(expires), bar)
+	bar := progressbar.NewOptions(int(info.Size()),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowTotalBytes(true),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetVisibility(!cfg.suppressOutput),
+		progressbar.OptionSetDescription("[cyan]"+optionStr+"[reset] uploading file..."))
+
+	alias, err := streamFileUpload(encryptedFilename, cfg.serverUrl+"/api", info, serverFilename, isEncrypting, int(expires), bar)
+	if err != nil {
+		log.Println("error occured:", err.Error())
+		return
+	}
+
+	log.Println()
+	log.Println()
+	log.Println("upload complete!")
+
+	fileUrl, err := url.JoinPath(cfg.serverUrl, alias)
+	if err != nil {
+		fmt.Println("error occured:", err.Error())
+		return
+	}
+
+	if cfg.copy {
+		err = clipboard.WriteAll(fileUrl)
 		if err != nil {
-			log.Println("error occured:", err.Error())
-			return
+			fmt.Println("error copying to clipboard:", err.Error())
 		}
-		log.Print("\033[1m")
-		fmt.Printf("%s", downloadUrl)
-		log.Print("\033[0m")
+		log.Println("(wrote to clipboard)")
+	}
 
+	log.Print("\033[1m")
+	fmt.Printf("%s", fileUrl)
+	log.Print("\033[0m")
+
+	if isEncrypting {
 		err = os.Remove(encryptedFilename)
 		if err != nil {
 			log.Println("error while deleting file:", err.Error())
 			return
 		}
-	} else {
-		bar := progressbar.NewOptions(int(info.Size()),
-			progressbar.OptionShowBytes(true),
-			progressbar.OptionEnableColorCodes(true),
-			progressbar.OptionShowTotalBytes(true),
-			progressbar.OptionShowCount(),
-			progressbar.OptionSetDescription("[cyan][1/1][reset] uploading file..."))
-
-		downloadUrl, err := streamFileUpload(filename, serverUrl+"/api", info, serverFilename, false, int(expires), bar)
-		log.Println()
-		if err != nil {
-			log.Println("error occured:", err.Error())
-			return
-		}
-		log.Println("upload complete!")
-		log.Printf("%s\033[0m\n", downloadUrl)
 	}
 }
 
-func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, serverFilename string, encrypted bool, expires int, bar *progressbar.ProgressBar) (string, error) {
+func streamFileUpload(filePath string, apiPath string, ogFileInfo os.FileInfo, serverFilename string, encrypted bool, expires int, bar *progressbar.ProgressBar) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err
@@ -244,28 +266,17 @@ func streamFileUpload(filePath, apiPath string, ogFileInfo os.FileInfo, serverFi
 		return "", errors.New("unexpected error: " + resp.Status)
 	}
 
-	if copy {
-		err := clipboard.WriteAll(serverUrl + "/" + string(respBody))
-		if err != nil {
-			return "", err
-		}
-		log.Println()
-		log.Println()
-		log.Println("upload complete!")
-		log.Println("(wrote to clipboard)")
-	}
-
-	return serverUrl + "/" + string(respBody), nil
+	return string(respBody), nil
 }
 
-func encryptFile(filename string, password string, progressBar *progressbar.ProgressBar) error {
+func encryptFile(filename string, encryptedOutput string, password string, progressBar *progressbar.ProgressBar) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	outFile, err := os.Create(encryptedFilename)
+	outFile, err := os.Create(encryptedOutput)
 	if err != nil {
 		return err
 	}
