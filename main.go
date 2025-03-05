@@ -51,9 +51,7 @@ const (
 )
 
 func main() {
-	ctx := kong.Parse(&CLI)
-	_ = ctx
-	fmt.Println(CLI.Upload.File)
+	kong.Parse(&CLI)
 
 	toUploadFile := "v8p.me-cli.tmp"
 
