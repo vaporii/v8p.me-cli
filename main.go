@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -43,17 +42,6 @@ var CLI struct {
 	} `cmd:"" help:"upload a file"`
 }
 
-type config struct {
-	serverUrl      string
-	copy           bool
-	password       string
-	expiresString  string
-	customFilename string
-	dryFilename    string
-	suppressOutput bool
-	filePath       string
-}
-
 // encryption params
 const (
 	iterations = 100000
@@ -62,52 +50,6 @@ const (
 	nonceSize  = 12
 )
 
-func parseFlags() (*config, error) {
-	cfg := &config{}
-
-	const serverUsage = "set custom server instead of default (https://v8p.me)"
-	flag.StringVar(&cfg.serverUrl, "server", "https://v8p.me", serverUsage)
-	flag.StringVar(&cfg.serverUrl, "s", "https://v8p.me", serverUsage)
-
-	const copyUsage = "automatically copy returned URL to clipboard"
-	flag.BoolVar(&cfg.copy, "copy", false, copyUsage)
-	flag.BoolVar(&cfg.copy, "c", false, copyUsage)
-
-	const passwordUsage = "enable encryption and set password"
-	flag.StringVar(&cfg.password, "password", "", passwordUsage)
-	flag.StringVar(&cfg.password, "p", "", passwordUsage)
-
-	const expiresUsage = "set expiry date of file (e.g., -e 1d, -e \"5 minutes\")"
-	flag.StringVar(&cfg.expiresString, "expires", "0m", expiresUsage)
-	flag.StringVar(&cfg.expiresString, "e", "0m", expiresUsage)
-
-	const filenameUsage = "override filename sent to server"
-	flag.StringVar(&cfg.customFilename, "filename", "", filenameUsage)
-	flag.StringVar(&cfg.customFilename, "f", "", filenameUsage)
-
-	const dryUsage = "skip upload and save encrypted file to disk as specified filename"
-	flag.StringVar(&cfg.dryFilename, "dry", "", dryUsage)
-	flag.StringVar(&cfg.dryFilename, "d", "", dryUsage)
-
-	const quietUsage = "suppress all output except the URL"
-	flag.BoolVar(&cfg.suppressOutput, "quiet", false, quietUsage)
-	flag.BoolVar(&cfg.suppressOutput, "q", false, quietUsage)
-
-	flag.Usage = func() {
-		printUsage()
-	}
-
-	flag.Parse()
-
-	args := flag.Args()
-	if len(args) == 0 {
-		return nil, errors.New("error: no filename provided")
-	}
-	cfg.filePath = args[len(args)-1]
-
-	return cfg, nil
-}
-
 func main() {
 	ctx := kong.Parse(&CLI)
 	_ = ctx
@@ -115,51 +57,44 @@ func main() {
 
 	toUploadFile := "v8p.me-cli.tmp"
 
-	log.SetFlags(0)
-
-	cfg, err := parseFlags()
-	if err != nil {
-		log.Println(err.Error())
-		printUsage()
-		return
+	if len(CLI.Upload.Dry) > 0 {
+		toUploadFile = CLI.Upload.Dry
 	}
 
-	if cfg.suppressOutput {
+	log.SetFlags(0)
+
+	if CLI.Upload.Quiet {
 		log.SetOutput(io.Discard)
 	}
 
-	if len(cfg.dryFilename) > 0 {
-		toUploadFile = cfg.dryFilename
-	}
-
-	expires, err := parseExpiry(cfg.expiresString)
+	expires, err := parseExpiry(CLI.Upload.Expires)
 	if err != nil {
 		log.Println(err.Error())
 		printUsage()
 		return
 	}
 
-	info, err := os.Stat(cfg.filePath)
+	info, err := os.Stat(CLI.Upload.File)
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
 	}
 
 	serverFilename := info.Name()
-	if len(cfg.customFilename) > 0 {
-		serverFilename = cfg.customFilename
+	if len(CLI.Upload.Filename) > 0 {
+		serverFilename = CLI.Upload.Filename
 	}
 
-	isEncrypting := len(cfg.password) > 0
+	isEncrypting := len(CLI.Upload.Password) > 0
 	if isEncrypting {
 		bar := progressbar.NewOptions(int(info.Size()),
 			progressbar.OptionShowBytes(true),
 			progressbar.OptionEnableColorCodes(true),
 			progressbar.OptionShowCount(),
-			progressbar.OptionSetVisibility(!cfg.suppressOutput),
+			progressbar.OptionSetVisibility(!CLI.Upload.Quiet),
 			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
 
-		err := encryptFile(cfg.filePath, toUploadFile, cfg.password, bar)
+		err := encryptFile(CLI.Upload.File, toUploadFile, CLI.Upload.Password, bar)
 		log.Println()
 		if err != nil {
 			log.Println("error occured:", err.Error())
@@ -167,7 +102,7 @@ func main() {
 		}
 		log.Println()
 
-		if len(cfg.dryFilename) > 0 {
+		if len(CLI.Upload.Dry) > 0 {
 			log.Println("encryption complete!")
 			return
 		}
@@ -180,7 +115,7 @@ func main() {
 			return
 		}
 	} else {
-		toUploadFile = cfg.filePath
+		toUploadFile = CLI.Upload.Filename
 	}
 
 	optionStr := "[2/2]"
@@ -193,10 +128,16 @@ func main() {
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowTotalBytes(true),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetVisibility(!cfg.suppressOutput),
+		progressbar.OptionSetVisibility(!CLI.Upload.Quiet),
 		progressbar.OptionSetDescription("[cyan]"+optionStr+"[reset] uploading file..."))
 
-	alias, err := streamFileUpload(toUploadFile, cfg.serverUrl+"/api", info, serverFilename, isEncrypting, int(expires), bar)
+	apiUrl, err := url.JoinPath(CLI.Upload.Server, "api")
+	if err != nil {
+		log.Println("error occured:", err.Error())
+		return
+	}
+
+	alias, err := streamFileUpload(toUploadFile, apiUrl, info, serverFilename, isEncrypting, int(expires), bar)
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
@@ -206,7 +147,7 @@ func main() {
 	log.Println()
 	log.Println("upload complete!")
 
-	fileUrl, err := url.JoinPath(cfg.serverUrl, alias)
+	fileUrl, err := url.JoinPath(CLI.Upload.Server, alias)
 	if err != nil {
 		fmt.Println("error occured:", err.Error())
 		return
