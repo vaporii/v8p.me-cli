@@ -26,17 +26,17 @@ import (
 )
 
 var CLI struct {
-	Upload struct {
-		Server string `help:"set custom server instead of default" default:"https://v8p.me" name:"server" short:"s"`
-		Copy   bool   `help:"automatically copy returned URL to clipboard" name:"copy" short:"c"`
+	U struct {
+		Server string `help:"set custom server instead of default" default:"https://v8p.me" name:"server" short:"s" group:"general:"`
+		Copy   bool   `help:"automatically copy returned URL to clipboard" name:"copy" short:"c" group:"general:"`
 
-		Password string `help:"enable encryption and set password" name:"password" short:"p"`
-		Expires  string `help:"set expiry date of file (e.g., -e 1d, -e \"5 minutes\")" name:"expires" short:"e"`
+		Password string `help:"enable encryption and set password" name:"password" short:"p" group:"security:"`
+		Expires  string `help:"set expiry date of file (e.g., -e 1d, -e \"5 minutes\")" name:"expires" short:"e" group:"security:"`
 
-		Filename string `help:"override filename sent to server" name:"filename" short:"f"`
-		Dry      string `help:"skip upload and save encrypted file to disk as specified filename" name:"dry" short:"d"`
+		Filename string `help:"override filename sent to server" name:"filename" short:"f" group:"upload behavior:"`
+		Dry      string `help:"skip upload and save encrypted file to disk as specified filename" name:"dry" short:"d" group:"upload behavior:"`
 
-		Quiet bool `help:"suppress all output except the URL" name:"quiet" short:"q"`
+		Quiet bool `help:"suppress all output except the URL" name:"quiet" short:"q" group:"output control:"`
 
 		File string `arg:"" name:"file" help:"file to upload" type:"existingfile" required:""`
 	} `cmd:"" help:"upload a file"`
@@ -51,48 +51,48 @@ const (
 )
 
 func main() {
-	kong.Parse(&CLI)
+	kong.Parse(&CLI, kong.Name("v8p"), kong.Description("cli file uploader for v8p.me"))
 
 	toUploadFile := "v8p.me-cli.tmp"
 
-	if len(CLI.Upload.Dry) > 0 {
-		toUploadFile = CLI.Upload.Dry
+	if len(CLI.U.Dry) > 0 {
+		toUploadFile = CLI.U.Dry
 	}
 
 	log.SetFlags(0)
 
-	if CLI.Upload.Quiet {
+	if CLI.U.Quiet {
 		log.SetOutput(io.Discard)
 	}
 
-	expires, err := parseExpiry(CLI.Upload.Expires)
+	expires, err := parseExpiry(CLI.U.Expires)
 	if err != nil {
 		log.Println(err.Error())
 		printUsage()
 		return
 	}
 
-	info, err := os.Stat(CLI.Upload.File)
+	info, err := os.Stat(CLI.U.File)
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
 	}
 
 	serverFilename := info.Name()
-	if len(CLI.Upload.Filename) > 0 {
-		serverFilename = CLI.Upload.Filename
+	if len(CLI.U.Filename) > 0 {
+		serverFilename = CLI.U.Filename
 	}
 
-	isEncrypting := len(CLI.Upload.Password) > 0
+	isEncrypting := len(CLI.U.Password) > 0
 	if isEncrypting {
 		bar := progressbar.NewOptions(int(info.Size()),
 			progressbar.OptionShowBytes(true),
 			progressbar.OptionEnableColorCodes(true),
 			progressbar.OptionShowCount(),
-			progressbar.OptionSetVisibility(!CLI.Upload.Quiet),
+			progressbar.OptionSetVisibility(!CLI.U.Quiet),
 			progressbar.OptionSetDescription("[cyan][1/2][reset] encrypting file..."))
 
-		err := encryptFile(CLI.Upload.File, toUploadFile, CLI.Upload.Password, bar)
+		err := encryptFile(CLI.U.File, toUploadFile, CLI.U.Password, bar)
 		log.Println()
 		if err != nil {
 			log.Println("error occured:", err.Error())
@@ -100,7 +100,7 @@ func main() {
 		}
 		log.Println()
 
-		if len(CLI.Upload.Dry) > 0 {
+		if len(CLI.U.Dry) > 0 {
 			log.Println("encryption complete!")
 			return
 		}
@@ -113,7 +113,7 @@ func main() {
 			return
 		}
 	} else {
-		toUploadFile = CLI.Upload.File
+		toUploadFile = CLI.U.File
 	}
 
 	optionStr := "[2/2]"
@@ -126,10 +126,10 @@ func main() {
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowTotalBytes(true),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetVisibility(!CLI.Upload.Quiet),
+		progressbar.OptionSetVisibility(!CLI.U.Quiet),
 		progressbar.OptionSetDescription("[cyan]"+optionStr+"[reset] uploading file..."))
 
-	apiUrl, err := url.JoinPath(CLI.Upload.Server, "api")
+	apiUrl, err := url.JoinPath(CLI.U.Server, "api")
 	if err != nil {
 		log.Println("error occured:", err.Error())
 		return
@@ -145,13 +145,13 @@ func main() {
 	log.Println()
 	log.Println("upload complete!")
 
-	fileUrl, err := url.JoinPath(CLI.Upload.Server, alias)
+	fileUrl, err := url.JoinPath(CLI.U.Server, alias)
 	if err != nil {
 		fmt.Println("error occured:", err.Error())
 		return
 	}
 
-	if CLI.Upload.Copy {
+	if CLI.U.Copy {
 		err = clipboard.WriteAll(fileUrl)
 		if err != nil {
 			fmt.Println("error copying to clipboard:", err.Error())
