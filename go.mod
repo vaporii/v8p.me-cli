@@ -3,6 +3,7 @@ module github.com/vaporii/v8p.me-cli
 go 1.24.0
 
 require (
+	github.com/alecthomas/kong v1.8.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/schollz/progressbar/v3 v3.18.0
 )

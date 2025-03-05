@@ -21,9 +21,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/atotto/clipboard"
 	"github.com/schollz/progressbar/v3"
 )
+
+var CLI struct {
+	Upload struct {
+		Server string `help:"set custom server instead of default" default:"https://v8p.me" name:"server" short:"s"`
+		Copy   bool   `help:"automatically copy returned URL to clipboard" name:"copy" short:"c"`
+
+		Password string `help:"enable encryption and set password" name:"password" short:"p"`
+		Expires  string `help:"set expiry date of file (e.g., -e 1d, -e \"5 minutes\")" name:"expires" short:"e"`
+
+		Filename string `help:"override filename sent to server" name:"filename" short:"f"`
+		Dry      string `help:"skip upload and save encrypted file to disk as specified filename" name:"dry" short:"d"`
+
+		Quiet bool `help:"suppress all output except the URL" name:"quiet" short:"q"`
+
+		File string `arg:"" name:"file" help:"file to upload" type:"existingfile" required:""`
+	} `cmd:"" help:"upload a file"`
+}
 
 type config struct {
 	serverUrl      string
@@ -91,6 +109,10 @@ func parseFlags() (*config, error) {
 }
 
 func main() {
+	ctx := kong.Parse(&CLI)
+	_ = ctx
+	fmt.Println(CLI.Upload.File)
+
 	toUploadFile := "v8p.me-cli.tmp"
 
 	log.SetFlags(0)
