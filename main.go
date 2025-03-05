@@ -153,7 +153,7 @@ func main() {
 		return
 	}
 
-	if cfg.copy {
+	if CLI.Upload.Copy {
 		err = clipboard.WriteAll(fileUrl)
 		if err != nil {
 			fmt.Println("error copying to clipboard:", err.Error())
