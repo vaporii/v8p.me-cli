@@ -115,7 +115,7 @@ func main() {
 			return
 		}
 	} else {
-		toUploadFile = CLI.Upload.Filename
+		toUploadFile = CLI.Upload.File
 	}
 
 	optionStr := "[2/2]"
