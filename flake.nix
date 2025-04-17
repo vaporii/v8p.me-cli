@@ -5,11 +5,16 @@
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs }@inputs:
   let
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
   in
   {
+    packages.${system}.default = (import ./nix { inherit pkgs; });
+
+    # nixosModules.default = self.nixosModules.v8p;
+    # nixosModules.v8p = import ./nix/modules/nixos.nix inputs;
 
     devShells.x86_64-linux.default = pkgs.mkShell {
       packages = with pkgs; [
