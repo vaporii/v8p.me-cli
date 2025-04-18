@@ -16,6 +16,9 @@
     nixosModules.default = self.nixosModules.v8p;
     nixosModules.v8p = import ./nix/nixos.nix inputs;
 
+    homeManagerModules.default = self.homeManagerModules.v8p;
+    homeManagerModules.v8p = import ./nix/home-manager.nix inputs;
+
     devShells.x86_64-linux.default = pkgs.mkShell {
       packages = with pkgs; [
         go
