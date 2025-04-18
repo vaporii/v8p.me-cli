@@ -14,7 +14,7 @@
     packages.${system}.default = (import ./nix { inherit pkgs; });
 
     nixosModules.default = self.nixosModules.v8p;
-    nixosModules.v8p = import ./nix/modules/nixos.nix inputs;
+    nixosModules.v8p = import ./nix/nixos.nix inputs;
 
     devShells.x86_64-linux.default = pkgs.mkShell {
       packages = with pkgs; [
