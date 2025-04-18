@@ -1,6 +1,4 @@
-{ config, lib, pkgs, ... }@inputs: let
-  
-in {
+inputs: { config, lib, pkgs, ... }: {
   options.v8p = {
     enable = lib.mkEnableOption "v8p";
   };
