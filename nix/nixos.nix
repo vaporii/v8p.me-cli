@@ -7,7 +7,7 @@ in {
 
   config = lib.mkIf config.v8p.enable {
     environment.systemPackages = [
-      
+      (import ./ { inherit pkgs; })
     ];
   };
 }
