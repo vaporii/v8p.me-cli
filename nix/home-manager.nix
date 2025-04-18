@@ -5,7 +5,7 @@ in {
     enable = lib.mkEnableOption "v8p";
   };
 
-  config = lib.mkIf config.programs.v8p {
+  config = lib.mkIf config.programs.v8p.enable {
     home.packages = [ inputs.self.packages.${system}.default ];
   };
 }
